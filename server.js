@@ -27,6 +27,10 @@ app.get("/.mcp.json", (req, res) => {
   res.sendFile(path.join(__dirname, "mcp.json"));
 });
 
+app.get("/.well-known/mcp.json", (req, res) => {
+  res.sendFile(path.join(__dirname, "mcp.json"));
+});
+
 // ------------------------------
 // GOOGLE AUTH SETUP
 // ------------------------------
