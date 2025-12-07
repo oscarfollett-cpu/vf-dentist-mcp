@@ -8,7 +8,11 @@ import { v4 as uuidv4 } from "uuid";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type"],
+}));
 app.use(bodyParser.json());
 // -------------------------------------
 // SERVE MCP MANIFEST FOR VOICEFLOW
