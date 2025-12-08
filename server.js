@@ -39,8 +39,9 @@ app.use((req, res, next) => {
   const authHeader = req.headers["authorization"];
   const tokenHeader = req.headers["x-auth-token"];
 
-  // Allow VF handshake (empty body)
-  if ((!authHeader && !tokenHeader) && (!req.body || Object.keys(req.body).length === 0)) {
+  // Allow VF handshake (empty body and no key)
+  if ((!authHeader && !tokenHeader) &&
+      (!req.body || Object.keys(req.body).length === 0)) {
     return next();
   }
 
@@ -49,7 +50,6 @@ app.use((req, res, next) => {
     return res.status(500).json({ error: "Server misconfigured" });
   }
 
-  // Check supported header types
   const valid =
     authHeader === `Bearer ${REQUIRED_KEY}` ||
     tokenHeader === REQUIRED_KEY;
