@@ -54,14 +54,20 @@ app.use((req, res, next) => {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+import fs from "fs";
+
+const manifest = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "mcp.json"), "utf8")
+);
+
 app.get("/mcp.json", (req, res) => {
-  res.type("application/json");
-  res.sendFile(path.join(__dirname, "mcp.json"));
+  res.setHeader("Content-Type", "application/json");
+  res.status(200).json(manifest);
 });
 
 app.get("/.well-known/mcp.json", (req, res) => {
-  res.type("application/json");
-  res.sendFile(path.join(__dirname, "mcp.json"));
+  res.setHeader("Content-Type", "application/json");
+  res.status(200).json(manifest);
 });
 
 // MCP health check
