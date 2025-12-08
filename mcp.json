@@ -1,14 +1,14 @@
 {
-  "name": "dentist_calendar",
   "version": "1.0.0",
-  "description": "MCP server for dentist appointment scheduling using Google Calendar.",
+  "name": "dentist_calendar_mcp",
+  "description": "MCP server for dentist Google Calendar scheduling.",
   "tools": [
     {
       "name": "check_availability",
+      "description": "Checks if a time slot is available and not conflicting or on weekends.",
       "type": "http",
       "method": "POST",
       "url": "/check",
-      "description": "Check if a timeslot is available and not on weekends.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -16,17 +16,26 @@
           "end": { "type": "string" }
         },
         "required": ["start", "end"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "available": { "type": "boolean" },
+          "reason": { "type": "string" },
+          "token": { "type": "string" }
+        }
       }
     },
     {
       "name": "create_appointment",
+      "description": "Creates a new Google Calendar appointment.",
       "type": "http",
       "method": "POST",
       "url": "/create",
-      "description": "Create a new dentist appointment in Google Calendar.",
       "inputSchema": {
         "type": "object",
         "properties": {
+          "token": { "type": "string" },
           "title": { "type": "string" },
           "start": { "type": "string" },
           "end": { "type": "string" },
@@ -36,19 +45,25 @@
               "name": { "type": "string" },
               "email": { "type": "string" },
               "phone": { "type": "string" }
-            },
-            "required": ["name"]
+            }
           }
         },
-        "required": ["title", "start", "end"]
+        "required": ["token", "title", "start", "end"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "eventId": { "type": "string" }
+        }
       }
     },
     {
       "name": "update_appointment",
+      "description": "Updates the date/time of an existing Google Calendar event.",
       "type": "http",
       "method": "POST",
       "url": "/update",
-      "description": "Update an existing appointment’s date and time.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -57,20 +72,33 @@
           "end": { "type": "string" }
         },
         "required": ["eventId", "start", "end"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "event": { "type": "object" }
+        }
       }
     },
     {
       "name": "delete_appointment",
+      "description": "Deletes an appointment from Google Calendar.",
       "type": "http",
       "method": "POST",
       "url": "/delete",
-      "description": "Delete a dentist appointment from the calendar.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "eventId": { "type": "string" }
         },
         "required": ["eventId"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" }
+        }
       }
     }
   ]
