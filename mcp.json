@@ -1,4 +1,5 @@
 {
+  "schema_version": "1.0",
   "name": "dentist_calendar",
   "version": "1.0.0",
   "description": "Google Calendar MCP server for dentist appointment booking.",
