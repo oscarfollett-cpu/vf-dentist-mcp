@@ -23,13 +23,13 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Correct MCP manifest routes for Voiceflow
+// MCP manifest routes
 app.get("/mcp.json", (req, res) => {
-  res.sendFile(path.join(__dirname, ".mcp.json"));
+  res.sendFile(path.join(__dirname, "mcp.json"));
 });
 
 app.get("/.well-known/mcp.json", (req, res) => {
-  res.sendFile(path.join(__dirname, ".mcp.json"));
+  res.sendFile(path.join(__dirname, "mcp.json"));
 });
 
 // MCP health check
