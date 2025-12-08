@@ -27,11 +27,13 @@ app.use((req, res, next) => {
     "/mcp.json",
     "/.well-known/mcp.json",
     "/status",
-    "/"
+    "/",
+    "/__vf_mcp_check" // Voiceflow MCP handshake
   ];
 
+  // Allow public paths
   if (openPaths.includes(req.path)) {
-    return next(); // allow public access to manifest + health check
+    return next();
   }
 
   const key = req.headers["x-api-key"];
@@ -41,6 +43,15 @@ app.use((req, res, next) => {
     return res.status(500).json({ error: "Server misconfigured" });
   }
 
+  // Allow Voiceflow preflight & validation (empty body / no API key)
+  if (!key) {
+    if (req.method === "OPTIONS") return res.sendStatus(200);
+    if (!req.body || Object.keys(req.body).length === 0) {
+      return next();
+    }
+  }
+
+  // Require correct API key for actual tool calls
   if (key !== REQUIRED_KEY) {
     return res.status(401).json({ error: "Unauthorized" });
   }
