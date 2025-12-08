@@ -1,7 +1,10 @@
 {
+  "name": "dentist_calendar",
   "version": "1.0.0",
-  "tools": {
-    "check_availability": {
+  "description": "Google Calendar MCP server for dentist appointment booking.",
+  "tools": [
+    {
+      "name": "check_availability",
       "type": "http",
       "method": "POST",
       "url": "/check",
@@ -14,7 +17,8 @@
         "required": ["start", "end"]
       }
     },
-    "create_appointment": {
+    {
+      "name": "create_appointment",
       "type": "http",
       "method": "POST",
       "url": "/create",
@@ -24,12 +28,22 @@
           "summary": { "type": "string" },
           "description": { "type": "string" },
           "start": { "type": "string" },
-          "end": { "type": "string" }
+          "end": { "type": "string" },
+          "patient": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "email": { "type": "string" },
+              "phone": { "type": "string" }
+            },
+            "required": ["name"]
+          }
         },
         "required": ["summary", "start", "end"]
       }
     },
-    "update_appointment": {
+    {
+      "name": "update_appointment",
       "type": "http",
       "method": "POST",
       "url": "/update",
@@ -43,7 +57,8 @@
         "required": ["eventId", "start", "end"]
       }
     },
-    "delete_appointment": {
+    {
+      "name": "delete_appointment",
       "type": "http",
       "method": "POST",
       "url": "/delete",
@@ -55,5 +70,5 @@
         "required": ["eventId"]
       }
     }
-  }
+  ]
 }
