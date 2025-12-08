@@ -55,10 +55,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 app.get("/mcp.json", (req, res) => {
+  res.type("application/json");
   res.sendFile(path.join(__dirname, "mcp.json"));
 });
 
 app.get("/.well-known/mcp.json", (req, res) => {
+  res.type("application/json");
   res.sendFile(path.join(__dirname, "mcp.json"));
 });
 
