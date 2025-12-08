@@ -18,11 +18,22 @@ app.use(cors({
 app.use(bodyParser.json());
 
 // -------------------------------------
-// REQUIRE API KEY FOR VOICEFLOW MCP
+// REQUIRE API KEY FOR MCP TOOLS (BUT NOT MANIFEST)
 // -------------------------------------
 const REQUIRED_KEY = process.env.MCP_API_KEY;
 
 app.use((req, res, next) => {
+  const openPaths = [
+    "/mcp.json",
+    "/.well-known/mcp.json",
+    "/status",
+    "/"
+  ];
+
+  if (openPaths.includes(req.path)) {
+    return next(); // allow public access to manifest + health check
+  }
+
   const key = req.headers["x-api-key"];
 
   if (!REQUIRED_KEY) {
