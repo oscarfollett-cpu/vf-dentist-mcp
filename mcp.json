@@ -2,6 +2,12 @@
   "version": "1.0.0",
   "name": "dentist_calendar_mcp",
   "description": "MCP server for dentist Google Calendar scheduling.",
+  
+  "auth": {
+    "type": "apiKey",
+    "header": "x-api-key"
+  },
+
   "tools": [
     {
       "name": "check_availability",
