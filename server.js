@@ -4,6 +4,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { google } from "googleapis";
 import { v4 as uuidv4 } from "uuid";
+import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
@@ -11,25 +13,42 @@ const app = express();
 app.use(cors({
   origin: "*",
   methods: ["GET", "POST"],
-  allowedHeaders: ["Content-Type"],
+  allowedHeaders: ["Content-Type", "x-api-key"],
 }));
 app.use(bodyParser.json());
+
+// -------------------------------------
+// REQUIRE API KEY FOR VOICEFLOW MCP
+// -------------------------------------
+const REQUIRED_KEY = process.env.MCP_API_KEY;
+
+app.use((req, res, next) => {
+  const key = req.headers["x-api-key"];
+
+  if (!REQUIRED_KEY) {
+    console.error("Missing MCP_API_KEY in environment!");
+    return res.status(500).json({ error: "Server misconfigured" });
+  }
+
+  if (key !== REQUIRED_KEY) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  next();
+});
+
 // -------------------------------------
 // SERVE MCP MANIFEST FOR VOICEFLOW
 // -------------------------------------
-import path from "path";
-import { fileURLToPath } from "url";
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// forcing railway redeploy
 app.get("/mcp.json", (req, res) => {
-  res.type("application/json").sendFile(path.join(__dirname, "mcp.json"));
+  res.sendFile(path.join(__dirname, "mcp.json"));
 });
 
 app.get("/.well-known/mcp.json", (req, res) => {
-  res.type("application/json").sendFile(path.join(__dirname, "mcp.json"));
+  res.sendFile(path.join(__dirname, "mcp.json"));
 });
 
 // MCP health check
@@ -57,7 +76,7 @@ const calendar = google.calendar({ version: "v3", auth });
 // ------------------------------
 function isWeekend(dateString) {
   const d = new Date(dateString);
-  const day = d.getUTCDay(); // Sun = 0, Sat = 6
+  const day = d.getUTCDay();
   return day === 0 || day === 6;
 }
 
@@ -90,7 +109,6 @@ app.post("/check", async (req, res) => {
     return res.json({ available: false, reason: "double_booking" });
   }
 
-  // Generate reservation token
   const token = uuidv4();
 
   return res.json({
