@@ -28,7 +28,7 @@ app.use((req, res, next) => {
     "/.well-known/mcp.json",
     "/status",
     "/",
-    "/__vf_mcp_check" // Voiceflow MCP handshake
+    "/__vf_mcp_check"
   ];
 
   // Allow public paths
@@ -36,23 +36,25 @@ app.use((req, res, next) => {
     return next();
   }
 
-  const key = req.headers["x-api-key"];
+  const authHeader = req.headers["authorization"];
+  const tokenHeader = req.headers["x-auth-token"];
+
+  // Allow VF handshake (empty body)
+  if ((!authHeader && !tokenHeader) && (!req.body || Object.keys(req.body).length === 0)) {
+    return next();
+  }
 
   if (!REQUIRED_KEY) {
     console.error("Missing MCP_API_KEY in environment!");
     return res.status(500).json({ error: "Server misconfigured" });
   }
 
-  // Allow Voiceflow preflight & validation (empty body / no API key)
-  if (!key) {
-    if (req.method === "OPTIONS") return res.sendStatus(200);
-    if (!req.body || Object.keys(req.body).length === 0) {
-      return next();
-    }
-  }
+  // Check supported header types
+  const valid =
+    authHeader === `Bearer ${REQUIRED_KEY}` ||
+    tokenHeader === REQUIRED_KEY;
 
-  // Require correct API key for actual tool calls
-  if (key !== REQUIRED_KEY) {
+  if (!valid) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
