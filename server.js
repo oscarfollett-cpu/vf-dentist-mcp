@@ -23,7 +23,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// MCP manifest routes
+// forcing railway redeploy
 app.get("/mcp.json", (req, res) => {
   res.type("application/json").sendFile(path.join(__dirname, "mcp.json"));
 });
