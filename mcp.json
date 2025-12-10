@@ -1,12 +1,18 @@
 {
-  "version": "1.0.0",
+  "schema": "1.0",
   "name": "dentist_calendar_mcp",
-  "description": "MCP server for dentist appointment scheduling with Google Calendar integration.",
+  "version": "1.0.0",
+
+  "description": "MCP server for dentist Google Calendar scheduling.",
+
+  "capabilities": {
+    "actions": {}
+  },
 
   "tools": [
     {
       "name": "check_availability",
-      "description": "Checks if the requested time slot is available and not on a weekend or double-booked.",
+      "description": "Checks if a time slot is available and not conflicting or on weekends.",
       "type": "http",
       "method": "POST",
       "url": "/check",
@@ -30,7 +36,7 @@
 
     {
       "name": "create_appointment",
-      "description": "Creates a new appointment in Google Calendar.",
+      "description": "Creates a new Google Calendar appointment.",
       "type": "http",
       "method": "POST",
       "url": "/create",
@@ -63,7 +69,7 @@
 
     {
       "name": "update_appointment",
-      "description": "Updates the date/time of an existing calendar appointment.",
+      "description": "Updates the date and time of an existing Google Calendar event.",
       "type": "http",
       "method": "POST",
       "url": "/update",
@@ -79,15 +85,14 @@
       "outputSchema": {
         "type": "object",
         "properties": {
-          "success": { "type": "boolean" },
-          "event": { "type": "object" }
+          "success": { "type": "boolean" }
         }
       }
     },
 
     {
       "name": "delete_appointment",
-      "description": "Deletes an appointment from Google Calendar.",
+      "description": "Deletes a Google Calendar appointment.",
       "type": "http",
       "method": "POST",
       "url": "/delete",
