@@ -1,14 +1,15 @@
 {
-  "schema": "1.0",
+  "schema_version": "1.0",
+  "protocol_version": "1.0",
   "name": "dentist_calendar_mcp",
   "version": "1.0.0",
-
   "description": "MCP server for dentist Google Calendar scheduling.",
-
+  "server": {
+    "type": "http"
+  },
   "capabilities": {
     "actions": {}
   },
-
   "tools": [
     {
       "name": "check_availability",
@@ -16,7 +17,7 @@
       "type": "http",
       "method": "POST",
       "url": "/check",
-      "inputSchema": {
+      "input_schema": {
         "type": "object",
         "properties": {
           "start": { "type": "string" },
@@ -24,7 +25,7 @@
         },
         "required": ["start", "end"]
       },
-      "outputSchema": {
+      "output_schema": {
         "type": "object",
         "properties": {
           "available": { "type": "boolean" },
@@ -33,14 +34,13 @@
         }
       }
     },
-
     {
       "name": "create_appointment",
       "description": "Creates a new Google Calendar appointment.",
       "type": "http",
       "method": "POST",
       "url": "/create",
-      "inputSchema": {
+      "input_schema": {
         "type": "object",
         "properties": {
           "token": { "type": "string" },
@@ -58,7 +58,7 @@
         },
         "required": ["token", "title", "start", "end"]
       },
-      "outputSchema": {
+      "output_schema": {
         "type": "object",
         "properties": {
           "success": { "type": "boolean" },
@@ -66,14 +66,13 @@
         }
       }
     },
-
     {
       "name": "update_appointment",
-      "description": "Updates the date and time of an existing Google Calendar event.",
+      "description": "Updates the date/time of an existing Google Calendar event.",
       "type": "http",
       "method": "POST",
       "url": "/update",
-      "inputSchema": {
+      "input_schema": {
         "type": "object",
         "properties": {
           "eventId": { "type": "string" },
@@ -82,28 +81,27 @@
         },
         "required": ["eventId", "start", "end"]
       },
-      "outputSchema": {
+      "output_schema": {
         "type": "object",
         "properties": {
           "success": { "type": "boolean" }
         }
       }
     },
-
     {
       "name": "delete_appointment",
-      "description": "Deletes a Google Calendar appointment.",
+      "description": "Deletes an appointment from Google Calendar.",
       "type": "http",
       "method": "POST",
       "url": "/delete",
-      "inputSchema": {
+      "input_schema": {
         "type": "object",
         "properties": {
           "eventId": { "type": "string" }
         },
         "required": ["eventId"]
       },
-      "outputSchema": {
+      "output_schema": {
         "type": "object",
         "properties": {
           "success": { "type": "boolean" }
