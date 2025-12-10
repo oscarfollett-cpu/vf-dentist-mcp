@@ -37,9 +37,7 @@ const manifest = JSON.parse(
   fs.readFileSync(path.join(__dirname, "mcp.json"), "utf8")
 );
 
-// -------------------------------------
-// AUTH MIDDLEWARE (Voiceflow compatible)
-// -------------------------------------
+// AUTH MIDDLEWARE -- VOICEFLOW MCP COMPATIBLE
 app.use((req, res, next) => {
   const openPaths = [
     "/",
@@ -54,20 +52,20 @@ app.use((req, res, next) => {
     return next();
   }
 
-  const key = req.headers["x-api-key"];
+  // Preferred VF header format:
+  const authHeader = req.headers["authorization"];
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.split(" ")[1]
+    : null;
 
-  // Voiceflow empty-body GET/OPTIONS validation flow
-  if (!key) {
+  // Allow empty-body GET/OPTIONS during VF handshake
+  if (!token) {
     if (req.method === "OPTIONS") return res.sendStatus(200);
-
-    // Allow GET or POST with empty body (VF handshake)
-    if (!req.body || Object.keys(req.body).length === 0) {
-      return next();
-    }
+    if (!req.body || Object.keys(req.body).length === 0) return next();
   }
 
-  // Now require key
-  if (key !== REQUIRED_KEY) {
+  // Validate MCP API key
+  if (token !== process.env.MCP_API_KEY) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
