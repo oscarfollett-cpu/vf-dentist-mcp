@@ -37,35 +37,26 @@ const manifest = JSON.parse(
   fs.readFileSync(path.join(__dirname, "mcp.json"), "utf8")
 );
 
-// AUTH MIDDLEWARE -- VOICEFLOW MCP COMPATIBLE
 app.use((req, res, next) => {
   const openPaths = [
     "/",
     "/status",
     "/mcp.json",
     "/.well-known/mcp.json",
-    "/__vf_mcp_check"
+    "/__vf_mcp_check",
+    "/__mcp/handshake",
+    "/__vf_mcp_validate"
   ];
 
-  // Public endpoints allowed
+  // Always allow manifest + handshake routes
   if (openPaths.includes(req.path)) {
     return next();
   }
 
-  // Preferred VF header format:
-  const authHeader = req.headers["authorization"];
-  const token = authHeader?.startsWith("Bearer ")
-    ? authHeader.split(" ")[1]
-    : null;
+  const key = req.headers["x-api-key"];
 
-  // Allow empty-body GET/OPTIONS during VF handshake
-  if (!token) {
-    if (req.method === "OPTIONS") return res.sendStatus(200);
-    if (!req.body || Object.keys(req.body).length === 0) return next();
-  }
-
-  // Validate MCP API key
-  if (token !== process.env.MCP_API_KEY) {
+  // If no key, reject
+  if (!key || key !== REQUIRED_KEY) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
