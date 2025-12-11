@@ -5,7 +5,8 @@
   "version": "1.0.0",
   "description": "MCP server for dentist Google Calendar scheduling.",
   "server": {
-    "type": "http"
+    "type": "http",
+    "url": "https://vf-dentist-mcp-production.up.railway.app"
   },
   "capabilities": {
     "actions": {}
@@ -13,11 +14,11 @@
   "tools": [
     {
       "name": "check_availability",
-      "description": "Checks if a time slot is available and not conflicting or on weekends.",
+      "description": "Checks if a time slot is available (no conflicts and not on weekends).",
       "type": "http",
       "method": "POST",
       "url": "/check",
-      "input_schema": {
+      "inputSchema": {
         "type": "object",
         "properties": {
           "start": { "type": "string" },
@@ -25,7 +26,7 @@
         },
         "required": ["start", "end"]
       },
-      "output_schema": {
+      "outputSchema": {
         "type": "object",
         "properties": {
           "available": { "type": "boolean" },
@@ -40,7 +41,7 @@
       "type": "http",
       "method": "POST",
       "url": "/create",
-      "input_schema": {
+      "inputSchema": {
         "type": "object",
         "properties": {
           "token": { "type": "string" },
@@ -58,7 +59,7 @@
         },
         "required": ["token", "title", "start", "end"]
       },
-      "output_schema": {
+      "outputSchema": {
         "type": "object",
         "properties": {
           "success": { "type": "boolean" },
@@ -72,7 +73,7 @@
       "type": "http",
       "method": "POST",
       "url": "/update",
-      "input_schema": {
+      "inputSchema": {
         "type": "object",
         "properties": {
           "eventId": { "type": "string" },
@@ -81,10 +82,11 @@
         },
         "required": ["eventId", "start", "end"]
       },
-      "output_schema": {
+      "outputSchema": {
         "type": "object",
         "properties": {
-          "success": { "type": "boolean" }
+          "success": { "type": "boolean" },
+          "event": { "type": "object" }
         }
       }
     },
@@ -94,14 +96,14 @@
       "type": "http",
       "method": "POST",
       "url": "/delete",
-      "input_schema": {
+      "inputSchema": {
         "type": "object",
         "properties": {
           "eventId": { "type": "string" }
         },
         "required": ["eventId"]
       },
-      "output_schema": {
+      "outputSchema": {
         "type": "object",
         "properties": {
           "success": { "type": "boolean" }
