@@ -13,6 +13,7 @@ dotenv.config();
 const app = express();
 app.use(bodyParser.json());
 
+// Allow required headers
 app.use(
   cors({
     origin: "*",
@@ -32,11 +33,14 @@ const REQUIRED_KEY = process.env.MCP_API_KEY;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load manifest once
+// Load manifest
 const manifest = JSON.parse(
   fs.readFileSync(path.join(__dirname, "mcp.json"), "utf8")
 );
 
+// -------------------------------------
+// AUTH MIDDLEWARE (VF compatible)
+// -------------------------------------
 app.use((req, res, next) => {
   const openPaths = [
     "/",
@@ -44,8 +48,8 @@ app.use((req, res, next) => {
     "/mcp.json",
     "/.well-known/mcp.json",
     "/__vf_mcp_check",
-    "/__mcp/handshake",
-    "/__vf_mcp_validate"
+    "/__vf_mcp_validate",
+    "/__mcp/handshake"
   ];
 
   // Always allow manifest + handshake routes
@@ -55,8 +59,16 @@ app.use((req, res, next) => {
 
   const key = req.headers["x-api-key"];
 
-  // If no key, reject
-  if (!key || key !== REQUIRED_KEY) {
+  // Allow VF TOOL VALIDATION (NO API KEY)
+  if (!key) {
+    if (req.method === "OPTIONS") return res.sendStatus(200);
+    if (!req.body || Object.keys(req.body).length === 0) {
+      return next(); // allow validation
+    }
+  }
+
+  // Require correct API key for real tool calls
+  if (key !== REQUIRED_KEY) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
@@ -78,22 +90,20 @@ app.get("/.well-known/mcp.json", (req, res) => {
 // HEALTH CHECK
 // -------------------------------------
 app.get("/status", (req, res) => {
-  res.status(200).json({ status: "ok" });
+  res.status(200).json({ ok: true });
 });
 
-// -------------------------------------
-// MAIN ROOT (must return JSON for Voiceflow)
-// -------------------------------------
+// Root must return JSON for VF
 app.get("/", (req, res) => {
   res.status(200).json({
-    status: "ok",
+    ok: true,
     service: "dentist-mcp",
     message: "Backend running"
   });
 });
 
 // -------------------------------------
-// GOOGLE AUTH SETUP
+// GOOGLE AUTH
 // -------------------------------------
 const auth = new google.auth.GoogleAuth({
   credentials: {
@@ -122,7 +132,7 @@ async function hasConflict(start, end) {
       timeMin: start,
       timeMax: end,
       singleEvents: true,
-      orderBy: "startTime"
+      orderBy: "startTime",
     });
 
     return res.data.items.length > 0;
@@ -133,8 +143,7 @@ async function hasConflict(start, end) {
 }
 
 // -------------------------------------
-// *** REQUIRED FOR VOICEFLOW VALIDATION ***
-// GET VERSIONS OF TOOL ROUTES
+// REQUIRED GET ROUTES (VF validation)
 // -------------------------------------
 app.get("/check", (req, res) => res.status(200).json({ ok: true }));
 app.get("/create", (req, res) => res.status(200).json({ ok: true }));
@@ -142,10 +151,10 @@ app.get("/update", (req, res) => res.status(200).json({ ok: true }));
 app.get("/delete", (req, res) => res.status(200).json({ ok: true }));
 
 // -------------------------------------
-// TOOL ROUTES (POST)
+// TOOL ENDPOINTS
 // -------------------------------------
 
-// Check availability
+// CHECK
 app.post("/check", async (req, res) => {
   const { start, end } = req.body;
 
@@ -157,14 +166,13 @@ app.post("/check", async (req, res) => {
     const conflict = await hasConflict(start, end);
     if (conflict) return res.json({ available: false, reason: "double_booking" });
 
-    const token = uuidv4();
-    return res.json({ available: true, token });
+    return res.json({ available: true, token: uuidv4() });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
 });
 
-// Create appointment
+// CREATE
 app.post("/create", async (req, res) => {
   const { token, title, start, end, patient } = req.body;
 
@@ -180,17 +188,16 @@ app.post("/create", async (req, res) => {
   try {
     const created = await calendar.events.insert({
       calendarId: process.env.GC_CALENDAR_ID,
-      resource: event
+      resource: event,
     });
 
     res.json({ success: true, eventId: created.data.id });
   } catch (err) {
-    console.error("Create error:", err.response?.data || err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Update appointment
+// UPDATE
 app.post("/update", async (req, res) => {
   const { eventId, start, end } = req.body;
 
@@ -206,12 +213,11 @@ app.post("/update", async (req, res) => {
 
     res.json({ success: true, event: updated.data });
   } catch (err) {
-    console.error("Update error:", err.response?.data || err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Delete appointment
+// DELETE
 app.post("/delete", async (req, res) => {
   const { eventId } = req.body;
 
@@ -223,7 +229,6 @@ app.post("/delete", async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error("Delete error:", err.response?.data || err);
     res.status(500).json({ error: err.message });
   }
 });
