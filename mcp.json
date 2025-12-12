@@ -1,86 +1,87 @@
 {
-  "schema_version": "1.0",
-  "name": "DentistMCP",
-  "description": "Tools for checking, creating, updating and deleting dentist appointments.",
-  "tools": [
-    {
-      "name": "check_availability",
-      "description": "Check if a time slot is free and get a booking token.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "start": { "type": "string" },
-          "end": { "type": "string" }
+  "mcp": {
+    "version": "1.0",
+    "name": "DentistMCP",
+    "tools": [
+      {
+        "name": "check_availability",
+        "description": "Check if a time slot is free and get a booking token.",
+        "input": {
+          "type": "object",
+          "properties": {
+            "start": { "type": "string" },
+            "end": { "type": "string" }
+          },
+          "required": ["start", "end"]
         },
-        "required": ["start", "end"]
+        "endpoint": {
+          "type": "http",
+          "method": "POST",
+          "url": "https://vf-dentist-mcp-production.up.railway.app/check"
+        }
       },
-      "endpoint": {
-        "type": "http",
-        "method": "POST",
-        "url": "https://vf-dentist-mcp-production.up.railway.app/check"
-      }
-    },
-    {
-      "name": "create_appointment",
-      "description": "Create a dentist appointment after confirming availability.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "token": { "type": "string" },
-          "title": { "type": "string" },
-          "start": { "type": "string" },
-          "end": { "type": "string" },
-          "patient": {
-            "type": "object",
-            "properties": {
-              "name": { "type": "string" },
-              "email": { "type": "string" },
-              "phone": { "type": "string" }
-            },
-            "required": ["name", "phone"]
-          }
+      {
+        "name": "create_appointment",
+        "description": "Create a dentist appointment after checking availability.",
+        "input": {
+          "type": "object",
+          "properties": {
+            "token": { "type": "string" },
+            "title": { "type": "string" },
+            "start": { "type": "string" },
+            "end": { "type": "string" },
+            "patient": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "email": { "type": "string" },
+                "phone": { "type": "string" }
+              },
+              "required": ["name", "phone"]
+            }
+          },
+          "required": ["token", "title", "start", "end", "patient"]
         },
-        "required": ["token", "title", "start", "end", "patient"]
+        "endpoint": {
+          "type": "http",
+          "method": "POST",
+          "url": "https://vf-dentist-mcp-production.up.railway.app/create"
+        }
       },
-      "endpoint": {
-        "type": "http",
-        "method": "POST",
-        "url": "https://vf-dentist-mcp-production.up.railway.app/create"
-      }
-    },
-    {
-      "name": "update_appointment",
-      "description": "Reschedule a dentist appointment.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "eventId": { "type": "string" },
-          "start": { "type": "string" },
-          "end": { "type": "string" }
+      {
+        "name": "update_appointment",
+        "description": "Reschedule a dentist appointment.",
+        "input": {
+          "type": "object",
+          "properties": {
+            "eventId": { "type": "string" },
+            "start": { "type": "string" },
+            "end": { "type": "string" }
+          },
+          "required": ["eventId", "start", "end"]
         },
-        "required": ["eventId", "start", "end"]
+        "endpoint": {
+          "type": "http",
+          "method": "POST",
+          "url": "https://vf-dentist-mcp-production.up.railway.app/update"
+        }
       },
-      "endpoint": {
-        "type": "http",
-        "method": "POST",
-        "url": "https://vf-dentist-mcp-production.up.railway.app/update"
-      }
-    },
-    {
-      "name": "delete_appointment",
-      "description": "Cancel an appointment using its eventId.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "eventId": { "type": "string" }
+      {
+        "name": "delete_appointment",
+        "description": "Cancel an appointment.",
+        "input": {
+          "type": "object",
+          "properties": {
+            "eventId": { "type": "string" }
+          },
+          "required": ["eventId"]
         },
-        "required": ["eventId"]
-      },
-      "endpoint": {
-        "type": "http",
-        "method": "POST",
-        "url": "https://vf-dentist-mcp-production.up.railway.app/delete"
+        "endpoint": {
+          "type": "http",
+          "method": "POST",
+          "url": "https://vf-dentist-mcp-production.up.railway.app/delete"
+        }
       }
-    }
-  ]
+    ]
+  }
 }
