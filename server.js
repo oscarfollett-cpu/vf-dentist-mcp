@@ -17,7 +17,7 @@ app.use(
   cors({
     origin: "*",
     methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "x-api-key"],
+    allowedHeaders: ["Content-Type", "Authorization"]
   })
 );
 
@@ -38,50 +38,31 @@ const manifest = JSON.parse(
 );
 
 // ----------------------------------------------------
-// VOICEFLOW HANDSHAKE (REQUIRED!)
+// VOICEFLOW HANDSHAKE
 // ----------------------------------------------------
-
-// GET version (optional)
-app.get("/__vf_mcp_check", (req, res) => {
-  res.status(200).json({ ok: true });
-});
-
-// POST version (Voiceflow requires this)
-app.post("/__vf_mcp_check", (req, res) => {
-  res.status(200).json({ ok: true });
-});
-
-// POST /validate — VF may call this too
-app.post("/__vf_mcp_validate", (req, res) => {
-  res.status(200).json({ ok: true });
-});
+app.get("/__vf_mcp_check", (req, res) => res.json({ ok: true }));
+app.post("/__vf_mcp_check", (req, res) => res.json({ ok: true }));
+app.post("/__vf_mcp_validate", (req, res) => res.json({ ok: true }));
 
 // ----------------------------------------------------
-// AUTH MIDDLEWARE (AFTER VF HANDSHAKES!)
+// AUTH MIDDLEWARE
 // ----------------------------------------------------
+// Open routes Voiceflow MUST access without auth
+const OPEN_PATHS = [
+  "/",
+  "/status",
+  "/mcp.json",
+  "/.well-known/mcp.json",
+  "/__vf_mcp_check",
+  "/__vf_mcp_validate"
+];
+
 app.use((req, res, next) => {
-  const openPaths = [
-    "/",
-    "/status",
-    "/mcp.json",
-    "/.well-known/mcp.json",
-    "/__vf_mcp_check",
-    "/__vf_mcp_validate"
-  ];
+  if (OPEN_PATHS.includes(req.path)) return next();
 
-  // Allow public + VF handshake routes
-  if (openPaths.includes(req.path)) return next();
-
-  // Require API key for tool calls
-  const key = req.headers["x-api-key"];
-
-  // Allow VF preflight & empty-body probes
-  if (!key) {
-    if (req.method === "OPTIONS") return res.sendStatus(200);
-    if (!req.body || Object.keys(req.body).length === 0) return next();
-  }
-
-  if (key !== REQUIRED_KEY) {
+  // Voiceflow sends: Authorization: Bearer <key>
+  const authHeader = req.headers["authorization"];
+  if (!authHeader || authHeader !== `Bearer ${REQUIRED_KEY}`) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
@@ -91,20 +72,13 @@ app.use((req, res, next) => {
 // ----------------------------------------------------
 // MCP MANIFEST ROUTES
 // ----------------------------------------------------
-app.get("/mcp.json", (req, res) => {
-  res.status(200).json(manifest);
-});
-
-app.get("/.well-known/mcp.json", (req, res) => {
-  res.status(200).json(manifest);
-});
+app.get("/mcp.json", (req, res) => res.json(manifest));
+app.get("/.well-known/mcp.json", (req, res) => res.json(manifest));
 
 // ----------------------------------------------------
 // HEALTH CHECK
 // ----------------------------------------------------
-app.get("/status", (req, res) => {
-  res.status(200).json({ ok: true });
-});
+app.get("/status", (req, res) => res.json({ ok: true }));
 
 // ----------------------------------------------------
 // GOOGLE AUTH SETUP
@@ -149,8 +123,6 @@ async function hasConflict(start, end) {
 // ----------------------------------------------------
 // TOOL ROUTES
 // ----------------------------------------------------
-
-// CHECK availability
 app.post("/check", async (req, res) => {
   const { start, end } = req.body;
 
@@ -171,7 +143,6 @@ app.post("/check", async (req, res) => {
   }
 });
 
-// CREATE appointment
 app.post("/create", async (req, res) => {
   const { token, title, start, end, patient } = req.body;
 
@@ -197,7 +168,6 @@ app.post("/create", async (req, res) => {
   }
 });
 
-// UPDATE appointment
 app.post("/update", async (req, res) => {
   const { eventId, start, end } = req.body;
 
@@ -218,7 +188,6 @@ app.post("/update", async (req, res) => {
   }
 });
 
-// DELETE appointment
 app.post("/delete", async (req, res) => {
   const { eventId } = req.body;
 

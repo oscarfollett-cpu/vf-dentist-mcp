@@ -1,9 +1,7 @@
 {
-  "mcpServer": {
-    "name": "DentistMCP",
-    "version": "1.0.0",
-    "description": "MCP tools for the dentist receptionist agent."
-  },
+  "schema_version": "1.0",
+  "name": "DentistMCP",
+  "description": "Tools for checking, creating, updating and deleting dentist appointments.",
   "tools": [
     {
       "name": "check_availability",
@@ -19,16 +17,12 @@
       "endpoint": {
         "type": "http",
         "method": "POST",
-        "url": "https://vf-dentist-mcp-production.up.railway.app/check",
-        "headers": {
-          "Content-Type": "application/json",
-          "x-api-key": "{{MCP_API_KEY}}"
-        }
+        "url": "https://vf-dentist-mcp-production.up.railway.app/check"
       }
     },
     {
       "name": "create_appointment",
-      "description": "Create a dentist appointment.",
+      "description": "Create a dentist appointment after confirming availability.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -42,7 +36,8 @@
               "name": { "type": "string" },
               "email": { "type": "string" },
               "phone": { "type": "string" }
-            }
+            },
+            "required": ["name", "phone"]
           }
         },
         "required": ["token", "title", "start", "end", "patient"]
@@ -50,51 +45,41 @@
       "endpoint": {
         "type": "http",
         "method": "POST",
-        "url": "https://vf-dentist-mcp-production.up.railway.app/create",
-        "headers": {
-          "Content-Type": "application/json",
-          "x-api-key": "{{MCP_API_KEY}}"
-        }
+        "url": "https://vf-dentist-mcp-production.up.railway.app/create"
       }
     },
     {
       "name": "update_appointment",
-      "description": "Reschedule an appointment.",
+      "description": "Reschedule a dentist appointment.",
       "input_schema": {
         "type": "object",
         "properties": {
           "eventId": { "type": "string" },
           "start": { "type": "string" },
           "end": { "type": "string" }
-        }
+        },
+        "required": ["eventId", "start", "end"]
       },
       "endpoint": {
         "type": "http",
         "method": "POST",
-        "url": "https://vf-dentist-mcp-production.up.railway.app/update",
-        "headers": {
-          "Content-Type": "application/json",
-          "x-api-key": "{{MCP_API_KEY}}"
-        }
+        "url": "https://vf-dentist-mcp-production.up.railway.app/update"
       }
     },
     {
       "name": "delete_appointment",
-      "description": "Cancel an appointment.",
+      "description": "Cancel an appointment using its eventId.",
       "input_schema": {
         "type": "object",
         "properties": {
           "eventId": { "type": "string" }
-        }
+        },
+        "required": ["eventId"]
       },
       "endpoint": {
         "type": "http",
         "method": "POST",
-        "url": "https://vf-dentist-mcp-production.up.railway.app/delete",
-        "headers": {
-          "Content-Type": "application/json",
-          "x-api-key": "{{MCP_API_KEY}}"
-        }
+        "url": "https://vf-dentist-mcp-production.up.railway.app/delete"
       }
     }
   ]
