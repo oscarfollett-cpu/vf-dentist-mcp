@@ -1,10 +1,10 @@
 {
   "version": "1.0",
-  "name": "Dentist MCP",
-  "description": "Dentist appointment scheduling MCP server",
-  "endpoints": {
-    "mcp": {
-      "url": "https://vf-dentist-mcp-production.up.railway.app/mcp"
+  "name": "Dentist Calendar MCP",
+  "description": "MCP server for dentist appointment booking",
+  "transports": {
+    "sse": {
+      "url": "/sse"
     }
   }
 }
