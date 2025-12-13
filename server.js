@@ -1,41 +1,31 @@
-// server.js
-// Voiceflow-compatible MCP + Google Calendar server
-
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import dotenv from "dotenv";
 import { google } from "googleapis";
 import { v4 as uuidv4 } from "uuid";
-import * as z from "zod";
-
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 
 dotenv.config();
 
-/* ------------------------------------------------------------------ */
-/* Google Calendar helpers                                             */
-/* ------------------------------------------------------------------ */
+const app = express();
+app.use(cors());
+app.use(bodyParser.json());
+
+/* ------------------------------------------------ */
+/* Google Calendar Helpers                          */
+/* ------------------------------------------------ */
 
 function getCalendar() {
-  const clientEmail = process.env.GC_SERVICE_ACCOUNT_EMAIL;
-  const privateKey = process.env.GC_PRIVATE_KEY;
-  const calendarId = process.env.GC_CALENDAR_ID;
-
-  if (!clientEmail || !privateKey || !calendarId) {
-    throw new Error("Missing Google Calendar environment variables");
-  }
-
-  const auth = new google.auth.JWT({
-    email: clientEmail,
-    key: privateKey.replace(/\\n/g, "\n"),
-    scopes: ["https://www.googleapis.com/auth/calendar"],
-  });
+  const auth = new google.auth.JWT(
+    process.env.GC_SERVICE_ACCOUNT_EMAIL,
+    null,
+    process.env.GC_PRIVATE_KEY.replace(/\\n/g, "\n"),
+    ["https://www.googleapis.com/auth/calendar"]
+  );
 
   return {
     calendar: google.calendar({ version: "v3", auth }),
-    calendarId,
+    calendarId: process.env.GC_CALENDAR_ID,
   };
 }
 
@@ -53,126 +43,107 @@ async function hasConflict(start, end) {
   return (res.data.items || []).length > 0;
 }
 
-async function createEvent({ title, description, start, end, patient }) {
-  const { calendar, calendarId } = getCalendar();
-
-  const event = {
-    summary: title || "Dentist Appointment",
-    description:
-      description ||
-      `Patient: ${patient.name}\nPhone: ${patient.phone}\nEmail: ${patient.email || "N/A"}`,
-    start: { dateTime: start },
-    end: { dateTime: end },
-  };
-
-  const res = await calendar.events.insert({
-    calendarId,
-    requestBody: event,
-  });
-
-  return res.data;
-}
-
-/* ------------------------------------------------------------------ */
-/* MCP SERVER (SINGLE INSTANCE — REQUIRED FOR VOICEFLOW)               */
-/* ------------------------------------------------------------------ */
-
-const mcpServer = new McpServer({
-  name: "Dentist MCP",
-  version: "1.0.0",
-});
-
-/* Tool: check_availability */
-mcpServer.tool(
-  "check_availability",
-  "Check if a time slot is free",
-  {
-    start: z.string(),
-    end: z.string(),
-  },
-  async ({ start, end }) => {
-    const available = !(await hasConflict(start, end));
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify({
-            available,
-            token: available ? uuidv4() : null,
-          }),
-        },
-      ],
-    };
-  }
-);
-
-/* Tool: create_appointment */
-mcpServer.tool(
-  "create_appointment",
-  "Create a dentist appointment",
-  {
-    token: z.string(),
-    title: z.string().optional(),
-    start: z.string(),
-    end: z.string(),
-    patient: z.object({
-      name: z.string(),
-      phone: z.string(),
-      email: z.string().optional(),
-    }),
-    description: z.string().optional(),
-  },
-  async ({ title, start, end, patient, description }) => {
-    if (await hasConflict(start, end)) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              success: false,
-              error: "Time slot unavailable",
-            }),
-          },
-        ],
-      };
-    }
-
-    const event = await createEvent({
-      title,
-      start,
-      end,
-      patient,
-      description,
-    });
-
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify({
-            success: true,
-            eventId: event.id,
-          }),
-        },
-      ],
-    };
-  }
-);
-
-/* ------------------------------------------------------------------ */
-/* EXPRESS APP                                                         */
-/* ------------------------------------------------------------------ */
-
-const app = createMcpExpressApp(mcpServer);
-
-app.use(cors());
-app.use(bodyParser.json());
+/* ------------------------------------------------ */
+/* Routes Voiceflow Calls                           */
+/* ------------------------------------------------ */
 
 app.get("/", (req, res) => {
   res.json({ ok: true });
 });
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`MCP Calendar server listening on port ${port}`);
+app.get("/mcp.json", (req, res) => {
+  res.sendFile(new URL("./mcp.json", import.meta.url).pathname);
+});
+
+/* CHECK AVAILABILITY */
+app.post("/check", async (req, res) => {
+  const { start, end } = req.body;
+
+  if (!start || !end) {
+    return res.status(400).json({ error: "Missing start or end" });
+  }
+
+  const available = !(await hasConflict(start, end));
+
+  res.json({
+    available,
+    token: available ? uuidv4() : null,
+  });
+});
+
+/* CREATE APPOINTMENT */
+app.post("/create", async (req, res) => {
+  const { token, title, start, end, patient } = req.body;
+
+  if (!token || !start || !end || !patient?.name || !patient?.phone) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  if (await hasConflict(start, end)) {
+    return res.status(409).json({ error: "Time slot unavailable" });
+  }
+
+  const { calendar, calendarId } = getCalendar();
+
+  const event = await calendar.events.insert({
+    calendarId,
+    requestBody: {
+      summary: title || "Dentist Appointment",
+      description: `Patient: ${patient.name}\nPhone: ${patient.phone}\nEmail: ${patient.email || "N/A"}`,
+      start: { dateTime: start },
+      end: { dateTime: end },
+    },
+  });
+
+  res.json({
+    success: true,
+    eventId: event.data.id,
+  });
+});
+
+/* UPDATE APPOINTMENT */
+app.post("/update", async (req, res) => {
+  const { eventId, start, end } = req.body;
+
+  if (!eventId || !start || !end) {
+    return res.status(400).json({ error: "Missing fields" });
+  }
+
+  const { calendar, calendarId } = getCalendar();
+
+  await calendar.events.patch({
+    calendarId,
+    eventId,
+    requestBody: {
+      start: { dateTime: start },
+      end: { dateTime: end },
+    },
+  });
+
+  res.json({ success: true });
+});
+
+/* DELETE APPOINTMENT */
+app.post("/delete", async (req, res) => {
+  const { eventId } = req.body;
+
+  if (!eventId) {
+    return res.status(400).json({ error: "Missing eventId" });
+  }
+
+  const { calendar, calendarId } = getCalendar();
+
+  await calendar.events.delete({
+    calendarId,
+    eventId,
+  });
+
+  res.json({ success: true });
+});
+
+/* ------------------------------------------------ */
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`REST MCP server listening on port ${PORT}`);
 });
