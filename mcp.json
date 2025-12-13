@@ -2,6 +2,11 @@
   "mcp": {
     "version": "1.0",
     "name": "DentistMCP",
+    "description": "MCP server providing calendar scheduling tools for a dental receptionist AI.",
+    "server": {
+      "type": "http"
+    },
+    "models": [],
     "tools": [
       {
         "name": "check_availability",
@@ -13,6 +18,9 @@
             "end": { "type": "string" }
           },
           "required": ["start", "end"]
+        },
+        "output": {
+          "type": "object"
         },
         "endpoint": {
           "type": "http",
@@ -42,6 +50,7 @@
           },
           "required": ["token", "title", "start", "end", "patient"]
         },
+        "output": { "type": "object" },
         "endpoint": {
           "type": "http",
           "method": "POST",
@@ -60,6 +69,7 @@
           },
           "required": ["eventId", "start", "end"]
         },
+        "output": { "type": "object" },
         "endpoint": {
           "type": "http",
           "method": "POST",
@@ -68,7 +78,7 @@
       },
       {
         "name": "delete_appointment",
-        "description": "Cancel an appointment.",
+        "description": "Cancel an appointment using its eventId.",
         "input": {
           "type": "object",
           "properties": {
@@ -76,6 +86,7 @@
           },
           "required": ["eventId"]
         },
+        "output": { "type": "object" },
         "endpoint": {
           "type": "http",
           "method": "POST",
