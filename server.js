@@ -12,23 +12,21 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-const API_KEY = process.env.MCP_API_KEY;
 
 /* ------------------------------------------------ */
-/* PUBLIC ROUTES — NO AUTH (REQUIRED BY VOICEFLOW)   */
+/* PUBLIC ROUTES — NO AUTH (VOICEFLOW REQUIRES THIS) */
 /* ------------------------------------------------ */
 
-// Root health check
 app.get("/", (req, res) => {
   res.status(200).json({ ok: true });
 });
 
-// 🔴 REQUIRED: Voiceflow handshake probe
+// REQUIRED Voiceflow handshake
 app.post("/", (req, res) => {
   res.status(200).json({ ok: true });
 });
 
-// Discovery endpoint
+// MCP discovery
 app.get("/.well-known/mcp.json", (req, res) => {
   res.json({
     version: "1.0",
@@ -43,25 +41,7 @@ app.get("/.well-known/mcp.json", (req, res) => {
 });
 
 /* ------------------------------------------------ */
-/* AUTH — APPLIES AFTER HANDSHAKE ONLY               */
-/* ------------------------------------------------ */
-
-function requireApiKey(req, res, next) {
-  const key = req.headers["x-api-key"];
-
-  if (!API_KEY) {
-    return res.status(500).json({ error: "MCP_API_KEY not set on server" });
-  }
-
-  if (!key || key !== API_KEY) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  next();
-}
-
-/* ------------------------------------------------ */
-/* MCP SERVER SETUP                                  */
+/* MCP SERVER                                       */
 /* ------------------------------------------------ */
 
 const mcp = new McpServer({
@@ -69,7 +49,7 @@ const mcp = new McpServer({
   version: "1.0.0"
 });
 
-// Example tool (Voiceflow requires at least one)
+// Example tool
 mcp.tool(
   "check_availability",
   "Check if a time slot is available",
@@ -94,10 +74,10 @@ mcp.tool(
 );
 
 /* ------------------------------------------------ */
-/* SSE TRANSPORT — THIS IS WHAT VOICEFLOW USES       */
+/* SSE TRANSPORT — MUST BE PUBLIC                    */
 /* ------------------------------------------------ */
 
-app.get("/sse", requireApiKey, async (req, res) => {
+app.get("/sse", async (req, res) => {
   const transport = new SSEServerTransport("/sse", res);
 
   res.on("close", () => {
