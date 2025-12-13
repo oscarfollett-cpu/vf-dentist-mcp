@@ -21,44 +21,50 @@ app.use(
   })
 );
 
-// ----------------------------------------------------
-// CONSTANTS
-// ----------------------------------------------------
 const REQUIRED_KEY = process.env.MCP_API_KEY;
 
-// ----------------------------------------------------
-// PATH HELPERS
-// ----------------------------------------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load manifest
+// Load manifest file
 const manifest = JSON.parse(
   fs.readFileSync(path.join(__dirname, "mcp.json"), "utf8")
 );
 
-// ----------------------------------------------------
-// VOICEFLOW HANDSHAKE
-// ----------------------------------------------------
-app.get("/__vf_mcp_check", (req, res) => res.json({ ok: true }));
+// ---------------------------------------------------------------------
+// VOICEFLOW OPEN ROUTES (NO AUTH)
+// ---------------------------------------------------------------------
+app.get("/", (req, res) => res.json({ ok: true }));
+
+app.get("/status", (req, res) => res.json({ ok: true }));
+
+app.get("/mcp.json", (req, res) => {
+  res.setHeader("Content-Type", "application/mcp+json");
+  res.send(JSON.stringify(manifest));
+});
+
+app.get("/.well-known/mcp.json", (req, res) => {
+  res.setHeader("Content-Type", "application/mcp+json");
+  res.send(JSON.stringify(manifest));
+});
+
 app.post("/__vf_mcp_check", (req, res) => res.json({ ok: true }));
 app.post("/__vf_mcp_validate", (req, res) => res.json({ ok: true }));
 
-// ----------------------------------------------------
-// AUTH MIDDLEWARE
-// ----------------------------------------------------
-// Open routes Voiceflow MUST access without auth
-const OPEN_PATHS = [
+// ---------------------------------------------------------------------
+// AUTH MIDDLEWARE FOR TOOL ROUTES ONLY
+// ---------------------------------------------------------------------
+const OPEN_PATHS = new Set([
   "/",
   "/status",
   "/mcp.json",
   "/.well-known/mcp.json",
   "/__vf_mcp_check",
   "/__vf_mcp_validate"
-];
+]);
 
 app.use((req, res, next) => {
-  if (OPEN_PATHS.includes(req.path)) return next();
+  if (OPEN_PATHS.has(req.path)) return next();
 
   // Voiceflow sends: Authorization: Bearer <key>
   const authHeader = req.headers["authorization"];
@@ -69,20 +75,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// ----------------------------------------------------
-// MCP MANIFEST ROUTES
-// ----------------------------------------------------
-app.get("/mcp.json", (req, res) => res.json(manifest));
-app.get("/.well-known/mcp.json", (req, res) => res.json(manifest));
-
-// ----------------------------------------------------
-// HEALTH CHECK
-// ----------------------------------------------------
-app.get("/status", (req, res) => res.json({ ok: true }));
-
-// ----------------------------------------------------
-// GOOGLE AUTH SETUP
-// ----------------------------------------------------
+// ---------------------------------------------------------------------
+// GOOGLE CALENDAR SETUP
+// ---------------------------------------------------------------------
 const auth = new google.auth.GoogleAuth({
   credentials: {
     type: "service_account",
@@ -95,9 +90,7 @@ const auth = new google.auth.GoogleAuth({
 
 const calendar = google.calendar({ version: "v3", auth });
 
-// ----------------------------------------------------
-// HELPERS
-// ----------------------------------------------------
+// helper: weekend rules
 function isWeekend(dateString) {
   const d = new Date(dateString);
   return d.getUTCDay() === 0 || d.getUTCDay() === 6;
@@ -120,9 +113,11 @@ async function hasConflict(start, end) {
   }
 }
 
-// ----------------------------------------------------
-// TOOL ROUTES
-// ----------------------------------------------------
+// ---------------------------------------------------------------------
+// TOOL ROUTES (Voiceflow calls these AFTER authentication works)
+// ---------------------------------------------------------------------
+
+// CHECK availability
 app.post("/check", async (req, res) => {
   const { start, end } = req.body;
 
@@ -143,10 +138,11 @@ app.post("/check", async (req, res) => {
   }
 });
 
+// CREATE
 app.post("/create", async (req, res) => {
   const { token, title, start, end, patient } = req.body;
 
-  if (!token) return res.status(400).json({ error: "No reservation token" });
+  if (!token) return res.status(400).json({ error: "Missing reservation token" });
 
   const event = {
     summary: title,
@@ -168,6 +164,7 @@ app.post("/create", async (req, res) => {
   }
 });
 
+// UPDATE
 app.post("/update", async (req, res) => {
   const { eventId, start, end } = req.body;
 
@@ -188,6 +185,7 @@ app.post("/update", async (req, res) => {
   }
 });
 
+// DELETE
 app.post("/delete", async (req, res) => {
   const { eventId } = req.body;
 
@@ -204,9 +202,6 @@ app.post("/delete", async (req, res) => {
   }
 });
 
-// ----------------------------------------------------
-app.get("/", (_, res) => res.json({ ok: true }));
-// ----------------------------------------------------
-
+// ---------------------------------------------------------------------
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`MCP backend running on ${port}`));
+app.listen(port, () => console.log(`MCP backend running on port ${port}`));

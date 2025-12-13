@@ -2,7 +2,7 @@
   "mcp": {
     "version": "1.0",
     "name": "DentistMCP",
-    "description": "MCP server providing calendar scheduling tools for a dental receptionist AI.",
+    "description": "Calendar scheduling tools for a dental AI receptionist.",
     "server": {
       "type": "http"
     },
@@ -10,7 +10,7 @@
     "tools": [
       {
         "name": "check_availability",
-        "description": "Check if a time slot is free and get a booking token.",
+        "description": "Check if a time slot is free and return a booking token.",
         "input": {
           "type": "object",
           "properties": {
@@ -30,7 +30,7 @@
       },
       {
         "name": "create_appointment",
-        "description": "Create a dentist appointment after checking availability.",
+        "description": "Create an appointment in Google Calendar.",
         "input": {
           "type": "object",
           "properties": {
@@ -50,7 +50,9 @@
           },
           "required": ["token", "title", "start", "end", "patient"]
         },
-        "output": { "type": "object" },
+        "output": {
+          "type": "object"
+        },
         "endpoint": {
           "type": "http",
           "method": "POST",
@@ -59,7 +61,7 @@
       },
       {
         "name": "update_appointment",
-        "description": "Reschedule a dentist appointment.",
+        "description": "Reschedule an appointment.",
         "input": {
           "type": "object",
           "properties": {
@@ -69,7 +71,9 @@
           },
           "required": ["eventId", "start", "end"]
         },
-        "output": { "type": "object" },
+        "output": {
+          "type": "object"
+        },
         "endpoint": {
           "type": "http",
           "method": "POST",
@@ -78,7 +82,7 @@
       },
       {
         "name": "delete_appointment",
-        "description": "Cancel an appointment using its eventId.",
+        "description": "Delete an appointment.",
         "input": {
           "type": "object",
           "properties": {
@@ -86,7 +90,9 @@
           },
           "required": ["eventId"]
         },
-        "output": { "type": "object" },
+        "output": {
+          "type": "object"
+        },
         "endpoint": {
           "type": "http",
           "method": "POST",
