@@ -1,207 +1,341 @@
+// server.js
+// MCP + Google Calendar server for Voiceflow
+
 import express from "express";
 import bodyParser from "body-parser";
 import cors from "cors";
 import dotenv from "dotenv";
 import { google } from "googleapis";
 import { v4 as uuidv4 } from "uuid";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+
+// MCP SDK imports
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
+import * as z from "zod/v4";
 
 dotenv.config();
 
-const app = express();
-app.use(bodyParser.json());
+/**
+ * 1) GOOGLE CALENDAR CLIENT
+ */
 
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"]
-  })
-);
+function getCalendar() {
+  const clientEmail = process.env.GC_SERVICE_ACCOUNT_EMAIL;
+  const privateKey = process.env.GC_PRIVATE_KEY;
+  const calendarId = process.env.GC_CALENDAR_ID;
 
-const REQUIRED_KEY = process.env.MCP_API_KEY;
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Load manifest file
-const manifest = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "mcp.json"), "utf8")
-);
-
-// ---------------------------------------------------------------------
-// VOICEFLOW OPEN ROUTES (NO AUTH)
-// ---------------------------------------------------------------------
-app.get("/", (req, res) => res.json({ ok: true }));
-
-app.get("/status", (req, res) => res.json({ ok: true }));
-
-app.get("/mcp.json", (req, res) => {
-  res.setHeader("Content-Type", "application/mcp+json");
-  res.send(JSON.stringify(manifest));
-});
-
-app.get("/.well-known/mcp.json", (req, res) => {
-  res.setHeader("Content-Type", "application/mcp+json");
-  res.send(JSON.stringify(manifest));
-});
-
-app.post("/__vf_mcp_check", (req, res) => res.json({ ok: true }));
-app.post("/__vf_mcp_validate", (req, res) => res.json({ ok: true }));
-
-// ---------------------------------------------------------------------
-// AUTH MIDDLEWARE FOR TOOL ROUTES ONLY
-// ---------------------------------------------------------------------
-const OPEN_PATHS = new Set([
-  "/",
-  "/status",
-  "/mcp.json",
-  "/.well-known/mcp.json",
-  "/__vf_mcp_check",
-  "/__vf_mcp_validate"
-]);
-
-app.use((req, res, next) => {
-  if (OPEN_PATHS.has(req.path)) return next();
-
-  // Voiceflow sends: Authorization: Bearer <key>
-  const authHeader = req.headers["authorization"];
-  if (!authHeader || authHeader !== `Bearer ${REQUIRED_KEY}`) {
-    return res.status(401).json({ error: "Unauthorized" });
+  if (!clientEmail || !privateKey || !calendarId) {
+    throw new Error(
+      "Missing GC_SERVICE_ACCOUNT_EMAIL, GC_PRIVATE_KEY, or GC_CALENDAR_ID env var"
+    );
   }
 
-  next();
-});
+  const jwt = new google.auth.JWT({
+    email: clientEmail,
+    key: privateKey.replace(/\\n/g, "\n"),
+    scopes: ["https://www.googleapis.com/auth/calendar"],
+  });
 
-// ---------------------------------------------------------------------
-// GOOGLE CALENDAR SETUP
-// ---------------------------------------------------------------------
-const auth = new google.auth.GoogleAuth({
-  credentials: {
-    type: "service_account",
-    project_id: process.env.GC_PROJECT_ID,
-    private_key: process.env.GC_PRIVATE_KEY.replace(/\\n/g, "\n"),
-    client_email: process.env.GC_CLIENT_EMAIL
-  },
-  scopes: ["https://www.googleapis.com/auth/calendar"]
-});
-
-const calendar = google.calendar({ version: "v3", auth });
-
-// helper: weekend rules
-function isWeekend(dateString) {
-  const d = new Date(dateString);
-  return d.getUTCDay() === 0 || d.getUTCDay() === 6;
+  const calendar = google.calendar({ version: "v3", auth: jwt });
+  return { calendar, calendarId };
 }
 
 async function hasConflict(start, end) {
-  try {
-    const response = await calendar.events.list({
-      calendarId: process.env.GC_CALENDAR_ID,
-      timeMin: start,
-      timeMax: end,
-      singleEvents: true,
-      orderBy: "startTime"
-    });
+  const { calendar, calendarId } = getCalendar();
 
-    return response.data.items.length > 0;
-  } catch (err) {
-    console.error("Google Calendar error:", err.response?.data || err);
-    throw new Error("google_calendar_error");
-  }
+  const response = await calendar.events.list({
+    calendarId,
+    timeMin: start,
+    timeMax: end,
+    singleEvents: true,
+    orderBy: "startTime",
+  });
+
+  return (response.data.items || []).length > 0;
 }
 
-// ---------------------------------------------------------------------
-// TOOL ROUTES (Voiceflow calls these AFTER authentication works)
-// ---------------------------------------------------------------------
-
-// CHECK availability
-app.post("/check", async (req, res) => {
-  const { start, end } = req.body;
-
-  if (isWeekend(start)) {
-    return res.json({ available: false, reason: "weekend_not_allowed" });
-  }
-
-  try {
-    const conflict = await hasConflict(start, end);
-
-    if (conflict) {
-      return res.json({ available: false, reason: "double_booking" });
-    }
-
-    return res.json({ available: true, token: uuidv4() });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// CREATE
-app.post("/create", async (req, res) => {
-  const { token, title, start, end, patient } = req.body;
-
-  if (!token) return res.status(400).json({ error: "Missing reservation token" });
+async function createEvent({ title, description, start, end, patient }) {
+  const { calendar, calendarId } = getCalendar();
 
   const event = {
-    summary: title,
-    description: `Name: ${patient?.name}\nEmail: ${patient?.email}\nPhone: ${patient?.phone}`,
-    start: { dateTime: start, timeZone: "Pacific/Auckland" },
-    end: { dateTime: end, timeZone: "Pacific/Auckland" }
+    summary: title || "Dentist Appointment",
+    description:
+      description ||
+      `Patient: ${patient?.name || "Unknown"}\nPhone: ${
+        patient?.phone || "N/A"
+      }\nEmail: ${patient?.email || "N/A"}`,
+    start: { dateTime: start },
+    end: { dateTime: end },
   };
 
-  try {
-    const created = await calendar.events.insert({
-      calendarId: process.env.GC_CALENDAR_ID,
-      resource: event
-    });
+  const response = await calendar.events.insert({
+    calendarId,
+    requestBody: event,
+  });
 
-    return res.json({ success: true, eventId: created.data.id });
-  } catch (err) {
-    console.error("Create error:", err.response?.data || err);
-    return res.status(500).json({ error: err.message });
-  }
-});
+  return response.data;
+}
 
-// UPDATE
-app.post("/update", async (req, res) => {
-  const { eventId, start, end } = req.body;
+async function updateEvent({ eventId, start, end }) {
+  const { calendar, calendarId } = getCalendar();
 
-  try {
-    const updated = await calendar.events.patch({
-      calendarId: process.env.GC_CALENDAR_ID,
-      eventId,
-      resource: {
-        start: { dateTime: start, timeZone: "Pacific/Auckland" },
-        end: { dateTime: end, timeZone: "Pacific/Auckland" }
+  const response = await calendar.events.patch({
+    calendarId,
+    eventId,
+    requestBody: {
+      start: { dateTime: start },
+      end: { dateTime: end },
+    },
+  });
+
+  return response.data;
+}
+
+async function deleteEvent({ eventId }) {
+  const { calendar, calendarId } = getCalendar();
+  await calendar.events.delete({ calendarId, eventId });
+}
+
+/**
+ * 2) BUILD MCP SERVER (TOOLS)
+ */
+
+function buildMcpServer() {
+  const server = new McpServer(
+    { name: "dentist-calendar", version: "1.0.0" },
+    {
+      capabilities: {
+        logging: {}, // allows logging back to client
+      },
+    }
+  );
+
+  // Tool: check_availability
+  server.tool(
+    "check_availability",
+    "Check if a time slot is free and get a booking token.",
+    {
+      start: z.string().describe("ISO 8601 start time, e.g. 2025-01-01T10:00:00+13:00"),
+      end: z.string().describe("ISO 8601 end time, e.g. 2025-01-01T10:30:00+13:00"),
+    },
+    async ({ start, end }) => {
+      const busy = await hasConflict(start, end);
+      const available = !busy;
+      const token = available ? uuidv4() : null;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ available, token }),
+          },
+        ],
+      };
+    }
+  );
+
+  // Tool: create_appointment
+  server.tool(
+    "create_appointment",
+    "Create a dentist appointment after checking availability.",
+    {
+      token: z.string().describe("Booking token from check_availability"),
+      title: z.string().default("Dentist Appointment"),
+      start: z.string().describe("ISO 8601 start time"),
+      end: z.string().describe("ISO 8601 end time"),
+      patient: z
+        .object({
+          name: z.string().describe("Patient name"),
+          email: z.string().optional().describe("Patient email"),
+          phone: z.string().describe("Patient phone"),
+        })
+        .describe("Patient details"),
+      description: z
+        .string()
+        .optional()
+        .describe("Optional description / reason for visit"),
+    },
+    async ({ token, title, start, end, patient, description }) => {
+      // Simple check: ensure token is non-empty (you can add your own tracking if you like)
+      if (!token) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                success: false,
+                error: "Missing booking token",
+              }),
+            },
+          ],
+        };
       }
-    });
 
-    return res.json({ success: true, event: updated.data });
-  } catch (err) {
-    console.error("Update error:", err.response?.data || err);
-    return res.status(500).json({ error: err.message });
-  }
-});
+      const busy = await hasConflict(start, end);
+      if (busy) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                success: false,
+                error: "Time slot is no longer available",
+              }),
+            },
+          ],
+        };
+      }
 
-// DELETE
-app.post("/delete", async (req, res) => {
-  const { eventId } = req.body;
+      const event = await createEvent({
+        title,
+        start,
+        end,
+        patient,
+        description,
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              eventId: event.id,
+            }),
+          },
+        ],
+      };
+    }
+  );
+
+  // Tool: update_appointment
+  server.tool(
+    "update_appointment",
+    "Reschedule an existing appointment using its eventId.",
+    {
+      eventId: z.string().describe("Google Calendar event ID"),
+      start: z.string().describe("New ISO 8601 start time"),
+      end: z.string().describe("New ISO 8601 end time"),
+    },
+    async ({ eventId, start, end }) => {
+      const busy = await hasConflict(start, end);
+      if (busy) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                success: false,
+                error: "New time slot is not available",
+              }),
+            },
+          ],
+        };
+      }
+
+      const event = await updateEvent({ eventId, start, end });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              eventId: event.id,
+            }),
+          },
+        ],
+      };
+    }
+  );
+
+  // Tool: delete_appointment
+  server.tool(
+    "delete_appointment",
+    "Cancel an appointment using its eventId.",
+    {
+      eventId: z.string().describe("Google Calendar event ID"),
+    },
+    async ({ eventId }) => {
+      await deleteEvent({ eventId });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              eventId,
+            }),
+          },
+        ],
+      };
+    }
+  );
+
+  return server;
+}
+
+/**
+ * 3) EXPRESS + MCP HTTP TRANSPORT
+ *    This is the part Voiceflow actually talks to.
+ */
+
+const app = createMcpExpressApp();
+
+// MCP endpoint (Streamable HTTP)
+app.post("/mcp", async (req, res) => {
+  const server = buildMcpServer();
 
   try {
-    await calendar.events.delete({
-      calendarId: process.env.GC_CALENDAR_ID,
-      eventId
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
     });
 
-    return res.json({ success: true });
-  } catch (err) {
-    console.error("Delete error:", err.response?.data || err);
-    return res.status(500).json({ error: err.message });
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+
+    res.on("close", () => {
+      transport.close();
+      server.close();
+    });
+  } catch (error) {
+    console.error("Error handling MCP request:", error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        jsonrpc: "2.0",
+        error: { code: -32603, message: "Internal server error" },
+        id: null,
+      });
+    }
   }
 });
 
-// ---------------------------------------------------------------------
+// Optional: allow GET/DELETE /mcp to fail cleanly
+app.get("/mcp", (req, res) => {
+  res
+    .status(405)
+    .json({ jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed" }, id: null });
+});
+
+app.delete("/mcp", (req, res) => {
+  res
+    .status(405)
+    .json({ jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed" }, id: null });
+});
+
+// Simple health check for you / curl
+app.get("/", (req, res) => {
+  res.json({ ok: true, mcp: true });
+});
+
+// Normal CORS & JSON parsing
+app.use(cors());
+app.use(bodyParser.json());
+
+// START SERVER
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`MCP backend running on port ${port}`));
+app.listen(port, () => {
+  console.log(`MCP Calendar server listening on port ${port}`);
+});
